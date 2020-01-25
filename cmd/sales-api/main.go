@@ -2,18 +2,80 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/ardanlabs/conf"
+	"github.com/pkg/errors"
+	"github.com/vikramcse/the-service/cmd/sales-api/internal/handlers"
+	"github.com/vikramcse/the-service/internal/platform/database"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Println("shutting down", "error: ", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	var cfg struct {
+		Web struct {
+			Address         string        `conf:"default:0.0.0.0:8000"`
+			ReadTimeout     time.Duration `conf:"default:5s"`
+			WriteTimeout    time.Duration `conf:"default:5s"`
+			ShutdownTimeout time.Duration `conf:"default:5s"`
+		}
+		DB struct {
+			User       string `conf:"default:postgres"`
+			Password   string `conf:"default:postgres,noprint"`
+			Host       string `conf:"default:localhost"`
+			Name       string `conf:"default:postgres"`
+			DisableTLS bool   `conf:"default:false"`
+		}
+	}
+
+	if err := conf.Parse(os.Args[1:], "SALES", &cfg); err != nil {
+		if err == conf.ErrHelpWanted {
+			usage, err := conf.Usage("SALES", &cfg)
+			if err != nil {
+				return errors.Wrap(err, "generating config usage")
+			}
+			fmt.Println(usage)
+			return nil
+		}
+
+		return errors.Wrap(err, "parsing config")
+	}
+
 	log.Println("main: Started")
 	defer log.Println("main: Completed")
+
+	out, err := conf.String(&cfg)
+	if err != nil {
+		return errors.Wrap(err, "generating config for output")
+	}
+	log.Printf("main: Config: \n%v\n", out)
+
+	// Start Database
+	db, err := database.Open(database.Config{
+		User:       cfg.DB.User,
+		Password:   cfg.DB.Password,
+		Host:       cfg.DB.Host,
+		Name:       cfg.DB.Name,
+		DisableTLS: cfg.DB.DisableTLS,
+	})
+	if err != nil {
+		return errors.Wrap(err, "connecting to db")
+	}
+	defer db.Close()
+
+	productsHandler := handlers.Products{DB: db}
 
 	// Api service configuration
 
@@ -24,10 +86,10 @@ func main() {
 	// WriteTimeout: It is maximum duration before timing out writes of the
 	// response.
 	api := http.Server{
-		Addr:         "0.0.0.0:8000",
-		Handler:      http.HandlerFunc(ListProducts),
-		ReadTimeout:  1 * time.Second,
-		WriteTimeout: 7 * time.Second,
+		Addr:         cfg.Web.Address,
+		Handler:      http.HandlerFunc(productsHandler.List),
+		ReadTimeout:  cfg.Web.ReadTimeout,
+		WriteTimeout: cfg.Web.WriteTimeout,
 	}
 
 	// Make a channel to listend for errors coming from the listener. Use a
@@ -52,15 +114,14 @@ func main() {
 
 	select {
 	case err := <-serverErrors:
-		log.Fatalf("error: listening and serving: %s", err)
+		return errors.Wrap(err, "starting server")
 	case <-shutdown:
 		log.Println("main: Starting shutdown")
 
 		// Added a deadline for request completion
 		// we can perfrom any chores in this time e.g clearing memory,
 		// resources etc.
-		const timeout = 5 * time.Second
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Web.ShutdownTimeout)
 		defer cancel()
 
 		// SetKeepAlivesEnabled will inform the webserver to not keep any
@@ -77,39 +138,14 @@ func main() {
 		// closign the servers listeners
 		err := api.Shutdown(ctx)
 		if err != nil {
-			log.Printf("main: Graceful shutdown did not complete in %v: %v", timeout, err)
+			log.Printf("main: Graceful shutdown did not complete in %v: %v", cfg.Web.ShutdownTimeout, err)
 			err = api.Close()
 		}
 
 		if err != nil {
-			log.Fatalf("main: could not stop server gracefully: %v", err)
+			return errors.Wrap(err, "could not stop server gracefully")
 		}
 	}
-}
 
-type Product struct {
-	Name     string `json:"name"`
-	Cost     int    `json: "cost"`
-	Quantity int    `json: "quantity"`
-}
-
-// ListProducts is an HTTP Handler for returning a list of Products.
-func ListProducts(w http.ResponseWriter, r *http.Request) {
-	list := []Product{
-		{Name: "Comic Books", Cost: 50, Quantity: 42},
-		{Name: "McDonalds Toys", Cost: 75, Quantity: 120},
-	}
-
-	data, err := json.Marshal(list)
-	if err != nil {
-		log.Println("error marshaling result", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(data); err != nil {
-		log.Println("error writing resutl", err)
-	}
+	return nil
 }
