@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,16 +11,59 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ardanlabs/conf"
 	"github.com/vikramcse/the-service/cmd/sales-api/internal/handlers"
 	"github.com/vikramcse/the-service/internal/platform/database"
 )
 
 func main() {
+
+	var cfg struct {
+		Web struct {
+			Address         string        `conf:"default:0.0.0.0:8000"`
+			ReadTimeout     time.Duration `conf:"default:5s"`
+			WriteTimeout    time.Duration `conf:"default:5s"`
+			ShutdownTimeout time.Duration `conf:"default:5s"`
+		}
+		DB struct {
+			User       string `conf:"default:postgres"`
+			Password   string `conf:"default:postgres,noprint"`
+			Host       string `conf:"default:localhost"`
+			Name       string `conf:"default:postgres"`
+			DisableTLS bool   `conf:"default:false"`
+		}
+	}
+
+	if err := conf.Parse(os.Args[1:], "SALES", &cfg); err != nil {
+		if err == conf.ErrHelpWanted {
+			usage, err := conf.Usage("SALES", &cfg)
+			if err != nil {
+				log.Fatal("error: generating conf usage: %v", err)
+			}
+			fmt.Println(usage)
+			return
+		}
+
+		log.Fatalf("error: parsing config: %s", err)
+	}
+
 	log.Println("main: Started")
 	defer log.Println("main: Completed")
 
+	out, err := conf.String(&cfg)
+	if err != nil {
+		log.Fatalf("error: generating conf for output: %v", err)
+	}
+	log.Printf("main: Config: \n%v\n", out)
+
 	// Start Database
-	db, err := database.Open()
+	db, err := database.Open(database.Config{
+		User:       cfg.DB.User,
+		Password:   cfg.DB.Password,
+		Host:       cfg.DB.Host,
+		Name:       cfg.DB.Name,
+		DisableTLS: cfg.DB.DisableTLS,
+	})
 	if err != nil {
 		log.Fatalf("error: connection to db: %s", err)
 	}
@@ -36,10 +80,10 @@ func main() {
 	// WriteTimeout: It is maximum duration before timing out writes of the
 	// response.
 	api := http.Server{
-		Addr:         "0.0.0.0:8000",
+		Addr:         cfg.Web.Address,
 		Handler:      http.HandlerFunc(productsHandler.List),
-		ReadTimeout:  1 * time.Second,
-		WriteTimeout: 7 * time.Second,
+		ReadTimeout:  cfg.Web.ReadTimeout,
+		WriteTimeout: cfg.Web.WriteTimeout,
 	}
 
 	// Make a channel to listend for errors coming from the listener. Use a
@@ -71,8 +115,7 @@ func main() {
 		// Added a deadline for request completion
 		// we can perfrom any chores in this time e.g clearing memory,
 		// resources etc.
-		const timeout = 5 * time.Second
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Web.ShutdownTimeout)
 		defer cancel()
 
 		// SetKeepAlivesEnabled will inform the webserver to not keep any
@@ -89,7 +132,7 @@ func main() {
 		// closign the servers listeners
 		err := api.Shutdown(ctx)
 		if err != nil {
-			log.Printf("main: Graceful shutdown did not complete in %v: %v", timeout, err)
+			log.Printf("main: Graceful shutdown did not complete in %v: %v", cfg.Web.ShutdownTimeout, err)
 			err = api.Close()
 		}
 

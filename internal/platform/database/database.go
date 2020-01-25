@@ -4,20 +4,38 @@ import (
 	"net/url"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // The database driver in use.
 )
 
-func Open() (*sqlx.DB, error) {
-	// Query Parameters
+// Config is the required properties to use the database.
+type Config struct {
+	User       string
+	Password   string
+	Host       string
+	Name       string
+	DisableTLS bool
+}
+
+// Open knows how to open a database connection based on the configuration.
+func Open(cfg Config) (*sqlx.DB, error) {
+
+	// Define SSL mode.
+	// sslMode := "require"
+	//if cfg.DisableTLS {
+	//	sslMode = "disable"
+	//}
+
+	// Query parameters.
 	q := make(url.Values)
 	q.Set("sslmode", "disable")
 	q.Set("timezone", "utc")
 
+	// Construct url.
 	u := url.URL{
 		Scheme:   "postgres",
-		User:     url.UserPassword("postgres", "postgres"),
-		Host:     "localhost",
-		Path:     "postgres",
+		User:     url.UserPassword(cfg.User, cfg.Password),
+		Host:     cfg.Host,
+		Path:     cfg.Name,
 		RawQuery: q.Encode(),
 	}
 
