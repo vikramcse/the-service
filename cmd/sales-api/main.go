@@ -9,11 +9,23 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/vikramcse/the-service/cmd/sales-api/internal/handlers"
+	"github.com/vikramcse/the-service/internal/platform/database"
 )
 
 func main() {
 	log.Println("main: Started")
 	defer log.Println("main: Completed")
+
+	// Start Database
+	db, err := database.Open()
+	if err != nil {
+		log.Fatalf("error: connection to db: %s", err)
+	}
+	defer db.Close()
+
+	productsHandler := handlers.Products{DB: db}
 
 	// Api service configuration
 
@@ -25,7 +37,7 @@ func main() {
 	// response.
 	api := http.Server{
 		Addr:         "0.0.0.0:8000",
-		Handler:      http.HandlerFunc(ListProducts),
+		Handler:      http.HandlerFunc(productsHandler.List),
 		ReadTimeout:  1 * time.Second,
 		WriteTimeout: 7 * time.Second,
 	}
