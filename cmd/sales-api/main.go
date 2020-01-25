@@ -24,6 +24,9 @@ func main() {
 }
 
 func run() error {
+	// Logging
+	log := log.New(os.Stdout, "SALES: ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+
 	var cfg struct {
 		Web struct {
 			Address         string        `conf:"default:0.0.0.0:8000"`
@@ -75,8 +78,6 @@ func run() error {
 	}
 	defer db.Close()
 
-	productsHandler := handlers.Products{DB: db}
-
 	// Api service configuration
 
 	// ReadTimeout: It defines how long you allow a connection to be open
@@ -87,7 +88,7 @@ func run() error {
 	// response.
 	api := http.Server{
 		Addr:         cfg.Web.Address,
-		Handler:      http.HandlerFunc(productsHandler.List),
+		Handler:      handlers.API(db, log),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,
 	}
