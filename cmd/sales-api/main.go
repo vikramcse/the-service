@@ -78,8 +78,6 @@ func run() error {
 	}
 	defer db.Close()
 
-	productsHandler := handlers.Products{DB: db, Log: log}
-
 	// Api service configuration
 
 	// ReadTimeout: It defines how long you allow a connection to be open
@@ -90,7 +88,7 @@ func run() error {
 	// response.
 	api := http.Server{
 		Addr:         cfg.Web.Address,
-		Handler:      http.HandlerFunc(productsHandler.List),
+		Handler:      handlers.API(db, log),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,
 	}
