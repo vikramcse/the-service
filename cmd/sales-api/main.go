@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,12 +11,19 @@ import (
 	"time"
 
 	"github.com/ardanlabs/conf"
+	"github.com/pkg/errors"
 	"github.com/vikramcse/the-service/cmd/sales-api/internal/handlers"
 	"github.com/vikramcse/the-service/internal/platform/database"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Println("shutting down", "error: ", err)
+		os.Exit(1)
+	}
+}
 
+func run() error {
 	var cfg struct {
 		Web struct {
 			Address         string        `conf:"default:0.0.0.0:8000"`
@@ -38,13 +44,13 @@ func main() {
 		if err == conf.ErrHelpWanted {
 			usage, err := conf.Usage("SALES", &cfg)
 			if err != nil {
-				log.Fatal("error: generating conf usage: %v", err)
+				return errors.Wrap(err, "generating config usage")
 			}
 			fmt.Println(usage)
-			return
+			return nil
 		}
 
-		log.Fatalf("error: parsing config: %s", err)
+		return errors.Wrap(err, "parsing config")
 	}
 
 	log.Println("main: Started")
@@ -52,7 +58,7 @@ func main() {
 
 	out, err := conf.String(&cfg)
 	if err != nil {
-		log.Fatalf("error: generating conf for output: %v", err)
+		return errors.Wrap(err, "generating config for output")
 	}
 	log.Printf("main: Config: \n%v\n", out)
 
@@ -65,7 +71,7 @@ func main() {
 		DisableTLS: cfg.DB.DisableTLS,
 	})
 	if err != nil {
-		log.Fatalf("error: connection to db: %s", err)
+		return errors.Wrap(err, "connecting to db")
 	}
 	defer db.Close()
 
@@ -108,7 +114,7 @@ func main() {
 
 	select {
 	case err := <-serverErrors:
-		log.Fatalf("error: listening and serving: %s", err)
+		return errors.Wrap(err, "starting server")
 	case <-shutdown:
 		log.Println("main: Starting shutdown")
 
@@ -137,34 +143,9 @@ func main() {
 		}
 
 		if err != nil {
-			log.Fatalf("main: could not stop server gracefully: %v", err)
+			return errors.Wrap(err, "could not stop server gracefully")
 		}
 	}
-}
 
-type Product struct {
-	Name     string `json:"name"`
-	Cost     int    `json: "cost"`
-	Quantity int    `json: "quantity"`
-}
-
-// ListProducts is an HTTP Handler for returning a list of Products.
-func ListProducts(w http.ResponseWriter, r *http.Request) {
-	list := []Product{
-		{Name: "Comic Books", Cost: 50, Quantity: 42},
-		{Name: "McDonalds Toys", Cost: 75, Quantity: 120},
-	}
-
-	data, err := json.Marshal(list)
-	if err != nil {
-		log.Println("error marshaling result", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(data); err != nil {
-		log.Println("error writing resutl", err)
-	}
+	return nil
 }
