@@ -32,10 +32,10 @@ func (a *App) Handle(method, url string, h Handler) {
 	wrappedFunc := func(w http.ResponseWriter, r *http.Request) {
 		err := h(w, r)
 		if err != nil {
-			res := ErrorResponse{
-				Error: err.Error(),
+			a.log.Printf("ERROR: %+v", err)
+			if err := RespondError(w, err); err != nil {
+				a.log.Printf("ERROR: %+v", err)
 			}
-			Respond(w, res, http.StatusInternalServerError)
 		}
 	}
 	a.mux.MethodFunc(method, url, wrappedFunc)
