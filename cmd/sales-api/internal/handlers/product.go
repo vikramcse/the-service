@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/jmoiron/sqlx"
+	"github.com/vikramcse/the-service/internal/platform/web"
 	"github.com/vikramcse/the-service/internal/product"
 )
 
@@ -24,17 +25,10 @@ func (p *Products) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := json.Marshal(list)
-	if err != nil {
-		p.Log.Println("error marshaling result", err)
+	if err := web.Respond(w, list, http.StatusOK); err != nil {
+		p.Log.Println("encoding response", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(data); err != nil {
-		p.Log.Println("error writing result", err)
 	}
 }
 
@@ -48,17 +42,10 @@ func (p *Products) Retrive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := json.Marshal(prod)
-	if err != nil {
-		p.Log.Println("error marshaling result", err)
+	if err := web.Respond(w, prod, http.StatusOK); err != nil {
+		p.Log.Println("encoding response", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(data); err != nil {
-		p.Log.Println("error writing result", err)
 	}
 }
 
@@ -80,16 +67,9 @@ func (p *Products) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := json.Marshal(prod)
-	if err != nil {
-		p.Log.Println("error marshalling result", err)
+	if err := web.Respond(w, &prod, http.StatusCreated); err != nil {
+		p.Log.Println("encoding response", "erorr", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusCreated)
-	if _, err := w.Write(data); err != nil {
-		p.Log.Println("error writing result", err)
 	}
 }
