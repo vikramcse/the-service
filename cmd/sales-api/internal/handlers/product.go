@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	"github.com/vikramcse/the-service/internal/platform/web"
 	"github.com/vikramcse/the-service/internal/product"
 )
@@ -17,59 +18,39 @@ type Products struct {
 	Log *log.Logger
 }
 
-func (p *Products) List(w http.ResponseWriter, r *http.Request) {
+func (p *Products) List(w http.ResponseWriter, r *http.Request) error {
 	list, err := product.List(p.DB)
 	if err != nil {
-		p.Log.Printf("error: listing products: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return errors.Wrap(err, "getting product list")
 	}
 
-	if err := web.Respond(w, list, http.StatusOK); err != nil {
-		p.Log.Println("encoding response", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	return web.Respond(w, list, http.StatusOK)
 }
 
-func (p *Products) Retrive(w http.ResponseWriter, r *http.Request) {
+func (p *Products) Retrive(w http.ResponseWriter, r *http.Request) error {
 	id := chi.URLParam(r, "id")
 
 	prod, err := product.Retrive(p.DB, id)
 	if err != nil {
-		p.Log.Printf("error: getting products: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return errors.Wrapf(err, "getting product %q", id)
 	}
 
-	if err := web.Respond(w, prod, http.StatusOK); err != nil {
-		p.Log.Println("encoding response", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	return web.Respond(w, prod, http.StatusOK)
 }
 
 // Create decodes the body of a request to create a new product. The full
 // product with generated fields is sent back in the response.
-func (p *Products) Create(w http.ResponseWriter, r *http.Request) {
+func (p *Products) Create(w http.ResponseWriter, r *http.Request) error {
 	var np product.NewProduct
 
 	if err := json.NewDecoder(r.Body).Decode(&np); err != nil {
-		p.Log.Println("decoding product", "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return errors.Wrapf(err, "decoding new product")
 	}
 
 	prod, err := product.Create(p.DB, np, time.Now())
 	if err != nil {
-		p.Log.Println("creating product", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return errors.Wrap(err, "creating new product")
 	}
 
-	if err := web.Respond(w, &prod, http.StatusCreated); err != nil {
-		p.Log.Println("encoding response", "erorr", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	return web.Respond(w, &prod, http.StatusCreated)
 }
