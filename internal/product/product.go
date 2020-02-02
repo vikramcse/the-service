@@ -16,7 +16,14 @@ var ErrInvalidID = errors.New("ID is not in it's proper form")
 func List(ctx context.Context, db *sqlx.DB) ([]Product, error) {
 	products := []Product{}
 
-	const q = `SELECT * FROM products`
+	const q = `
+			SELECT 
+				p.*,
+				COALESCE(SUM(s.quantity), 0) as sold,
+				COALESCE(SUM(s.paid), 0) as revenue
+			FROM products as p
+			LEFT JOIN sales as s ON(p.product_id=s.product_id)
+			GROUP BY p.product_id`
 
 	if err := db.SelectContext(ctx, &products, q); err != nil {
 		return nil, errors.Wrap(err, "selecting products")
@@ -31,8 +38,16 @@ func Retrive(ctx context.Context, db *sqlx.DB, id string) (*Product, error) {
 	}
 
 	var p Product
+	const q = `
+			SELECT 
+				p.*,
+				COALESCE(SUM(s.quantity), 0) as sold,
+				COALESCE(SUM(s.paid), 0) as revenue
+			FROM products as p
+			LEFT JOIN sales as s ON(p.product_id=s.product_id)
+			WHERE p.product_id = $1
+			GROUP BY p.product_id`
 
-	const q = `SELECT * FROM products WHERE product_id = $1`
 	if err := db.GetContext(ctx, &p, q, id); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound

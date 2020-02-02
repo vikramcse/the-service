@@ -25,7 +25,6 @@ func TestProducts(t *testing.T) {
 	log := log.New(os.Stderr, "Test: ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	tests := ProductTests{app: handlers.API(db, log)}
 	t.Run("List", tests.List)
-	//t.Run("ProductCURD", tests.ProductCURD)
 }
 
 type ProductTests struct {
@@ -53,6 +52,8 @@ func (p *ProductTests) List(t *testing.T) {
 			"name":         "Comic Books",
 			"cost":         float64(50),
 			"quantity":     float64(42),
+			"revenue":      float64(350),
+			"sold":         float64(7),
 			"date_created": "2019-01-01T00:00:01.000001Z",
 			"date_updated": "2019-01-01T00:00:01.000001Z",
 		},
@@ -61,6 +62,8 @@ func (p *ProductTests) List(t *testing.T) {
 			"name":         "McDonalds Toys",
 			"cost":         float64(75),
 			"quantity":     float64(120),
+			"revenue":      float64(255),
+			"sold":         float64(3),
 			"date_created": "2019-01-01T00:00:02.000001Z",
 			"date_updated": "2019-01-01T00:00:02.000001Z",
 		},
