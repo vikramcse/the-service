@@ -19,7 +19,7 @@ type Products struct {
 }
 
 func (p *Products) List(w http.ResponseWriter, r *http.Request) error {
-	list, err := product.List(p.DB)
+	list, err := product.List(r.Context(), p.DB)
 	if err != nil {
 		return errors.Wrap(err, "getting product list")
 	}
@@ -30,7 +30,7 @@ func (p *Products) List(w http.ResponseWriter, r *http.Request) error {
 func (p *Products) Retrive(w http.ResponseWriter, r *http.Request) error {
 	id := chi.URLParam(r, "id")
 
-	prod, err := product.Retrive(p.DB, id)
+	prod, err := product.Retrive(r.Context(), p.DB, id)
 	if err != nil {
 		switch err {
 		case product.ErrNotFound:
@@ -53,7 +53,7 @@ func (p *Products) Create(w http.ResponseWriter, r *http.Request) error {
 		return errors.Wrapf(err, "decoding new product")
 	}
 
-	prod, err := product.Create(p.DB, np, time.Now())
+	prod, err := product.Create(r.Context(), p.DB, np, time.Now())
 	if err != nil {
 		return errors.Wrap(err, "creating new product")
 	}

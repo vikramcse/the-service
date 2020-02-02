@@ -1,6 +1,7 @@
 package product
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -12,19 +13,19 @@ import (
 var ErrNotFound = errors.New("Product not found")
 var ErrInvalidID = errors.New("ID is not in it's proper form")
 
-func List(db *sqlx.DB) ([]Product, error) {
+func List(ctx context.Context, db *sqlx.DB) ([]Product, error) {
 	products := []Product{}
 
 	const q = `SELECT * FROM products`
 
-	if err := db.Select(&products, q); err != nil {
+	if err := db.SelectContext(ctx, &products, q); err != nil {
 		return nil, errors.Wrap(err, "selecting products")
 	}
 
 	return products, nil
 }
 
-func Retrive(db *sqlx.DB, id string) (*Product, error) {
+func Retrive(ctx context.Context, db *sqlx.DB, id string) (*Product, error) {
 	if _, err := uuid.Parse(id); err != nil {
 		return nil, ErrInvalidID
 	}
@@ -32,7 +33,7 @@ func Retrive(db *sqlx.DB, id string) (*Product, error) {
 	var p Product
 
 	const q = `SELECT * FROM products WHERE product_id = $1`
-	if err := db.Get(&p, q, id); err != nil {
+	if err := db.GetContext(ctx, &p, q, id); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
@@ -41,7 +42,7 @@ func Retrive(db *sqlx.DB, id string) (*Product, error) {
 	return &p, nil
 }
 
-func Create(db *sqlx.DB, np NewProduct, now time.Time) (*Product, error) {
+func Create(ctx context.Context, db *sqlx.DB, np NewProduct, now time.Time) (*Product, error) {
 	p := Product{
 		ID:          uuid.New().String(),
 		Name:        np.Name,
@@ -56,7 +57,7 @@ func Create(db *sqlx.DB, np NewProduct, now time.Time) (*Product, error) {
 			(product_id, name, cost, quantity, date_created, date_updated)
 			VALUES ($1, $2, $3, $4, $5, $6)`
 
-	_, err := db.Exec(q, p.ID, p.Name, p.Cost, p.Quantity, p.DateCreated, p.DateUpdated)
+	_, err := db.ExecContext(ctx, q, p.ID, p.Name, p.Cost, p.Quantity, p.DateCreated, p.DateUpdated)
 	if err != nil {
 		return nil, errors.Wrap(err, "inserting product")
 	}
