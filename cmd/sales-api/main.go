@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -30,6 +31,7 @@ func run() error {
 	var cfg struct {
 		Web struct {
 			Address         string        `conf:"default:0.0.0.0:8000"`
+			Debug           string        `conf:"default:0.0.0.0:6060"`
 			ReadTimeout     time.Duration `conf:"default:5s"`
 			WriteTimeout    time.Duration `conf:"default:5s"`
 			ShutdownTimeout time.Duration `conf:"default:5s"`
@@ -77,6 +79,13 @@ func run() error {
 		return errors.Wrap(err, "connecting to db")
 	}
 	defer db.Close()
+
+	// Start Debug Service
+	go func() {
+		log.Println("debug service listening on", cfg.Web.Debug)
+		err := http.ListenAndServe(cfg.Web.Debug, http.DefaultServeMux)
+		log.Println("debug service closed", err)
+	}()
 
 	// Api service configuration
 
