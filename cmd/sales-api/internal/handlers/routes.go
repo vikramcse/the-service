@@ -5,11 +5,12 @@ import (
 	"net/http"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/vikramcse/the-service/internal/mid"
 	"github.com/vikramcse/the-service/internal/platform/web"
 )
 
 func API(db *sqlx.DB, log *log.Logger) http.Handler {
-	app := web.NewApp(log)
+	app := web.NewApp(log, mid.Errors(log))
 
 	{
 		c := Check{db: db}
