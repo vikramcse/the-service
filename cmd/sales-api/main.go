@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "expvar"
 	"fmt"
 	"log"
 	"net/http"
@@ -81,6 +82,8 @@ func run() error {
 	defer db.Close()
 
 	// Start Debug Service
+	// /debug/pprof - Added to the default mux by imporing pprof package
+	// /debug/vars - Added to the default mux my imporing expvar package
 	go func() {
 		log.Println("debug service listening on", cfg.Web.Debug)
 		err := http.ListenAndServe(cfg.Web.Debug, http.DefaultServeMux)

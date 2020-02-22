@@ -17,7 +17,8 @@ type App struct {
 	mw  []Middleware
 }
 
-// NewApp constructs an App to handle a set of routes
+// NewApp constructs an App to handle a set of routes. Any Middleware provided
+// will be ran for every request
 func NewApp(log *log.Logger, mw ...Middleware) *App {
 	return &App{
 		log: log,
