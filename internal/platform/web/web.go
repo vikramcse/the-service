@@ -1,11 +1,25 @@
 package web
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi"
 )
+
+// ctxKey represents the type of value for the context key
+type ctxKey int
+
+// keyValues is how request values are stored/retrived
+const KeyValues ctxKey = 1
+
+// Values carries information about reach request
+type Values struct {
+	StatusCode int
+	Start      time.Time
+}
 
 type Handler func(http.ResponseWriter, *http.Request) error
 
@@ -35,6 +49,12 @@ func (a *App) Handle(method, url string, h Handler) {
 	h = wrapMiddleware(a.mw, h)
 
 	fn := func(w http.ResponseWriter, r *http.Request) {
+		v := Values{
+			Start: time.Now(),
+		}
+		ctx := context.WithValue(r.Context(), KeyValues, &v)
+		r = r.WithContext(ctx)
+
 		if err := h(w, r); err != nil {
 			a.log.Printf("Unhandled error: %+v", err)
 		}
